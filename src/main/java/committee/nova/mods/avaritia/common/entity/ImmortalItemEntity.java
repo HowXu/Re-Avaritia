@@ -1,7 +1,8 @@
 package committee.nova.mods.avaritia.common.entity;
 
 
-import committee.nova.mods.avaritia.init.config.ModConfig;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -9,8 +10,10 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.UUID;
 
 /**
  * Description:
@@ -19,6 +22,11 @@ import org.jetbrains.annotations.NotNull;
  * Version: 1.0
  */
 public class ImmortalItemEntity extends ItemEntity {
+    private static final int RETURN_PICKUP_DELAY = 5;
+    private static final int INFINITE_PICKUP_DELAY = 32767;
+    @Nullable
+    private UUID lockedReturnPlayerId;
+
     public ImmortalItemEntity(EntityType<? extends ItemEntity> type, Level level) {
         super(type, level);
         this.lifespan = Integer.MAX_VALUE;
@@ -30,7 +38,7 @@ public class ImmortalItemEntity extends ItemEntity {
         if (entity != null) {
             entity.setPos(x, y, z);
             entity.setItem(itemStack);
-            entity.setDefaultPickUpDelay();
+            entity.setPickUpDelay(RETURN_PICKUP_DELAY);
             entity.applyImmortalLifetime();
         }
         return entity;
@@ -42,6 +50,9 @@ public class ImmortalItemEntity extends ItemEntity {
         if (entity != null) {
             entity.restoreFrom(location);
             entity.setItem(itemStack);
+            entity.lockedReturnPlayerId = getLockedReturnPlayerId(location);
+            entity.lockToReturnPlayer();
+            entity.shortenPickupDelay();
             entity.applyImmortalLifetime();
         }
         return entity;
@@ -61,27 +72,97 @@ public class ImmortalItemEntity extends ItemEntity {
     public void tick() {
         super.tick();
 
-
         if (!this.level().isClientSide) {
-
-            Player targetPlayer = this.level().getNearestPlayer(this, ModConfig.immortalItemEntityRange.get());
-
-
-            if (targetPlayer != null) {
-
-                Vec3 direction = new Vec3(
-                        targetPlayer.getX() - this.getX(),
-                        targetPlayer.getY() + targetPlayer.getEyeHeight() - this.getY(),
-                        targetPlayer.getZ() - this.getZ()
-                ).normalize();
-
-
-                this.setDeltaMovement(direction.scale(ModConfig.immortalItemEntitySpeed.get()));
-
-
-                this.setDeltaMovement(this.getDeltaMovement().add(0, -0.02D, 0));
-            }
+            returnToOwner();
         }
+    }
+
+    private void returnToOwner() {
+        if (this.pickupDelay > 0) {
+            return;
+        }
+
+        Player player = findReturnPlayer();
+        if (player == null) {
+            return;
+        }
+
+        ItemStack remaining = this.getItem().copy();
+        if (remaining.isEmpty()) {
+            return;
+        }
+
+        player.getInventory().add(remaining);
+        if (remaining.isEmpty()) {
+            this.discard();
+            return;
+        }
+
+        this.setItem(remaining);
+        this.teleportTo(player.getX(), player.getY() + 0.25D, player.getZ());
+        this.setDeltaMovement(0.0D, 0.0D, 0.0D);
+        this.setPickUpDelay(RETURN_PICKUP_DELAY);
+        this.lockToReturnPlayer();
+    }
+
+    private void shortenPickupDelay() {
+        if (this.pickupDelay != INFINITE_PICKUP_DELAY) {
+            this.pickupDelay = Math.min(this.pickupDelay, RETURN_PICKUP_DELAY);
+        }
+    }
+
+    @Nullable
+    private static UUID getLockedReturnPlayerId(Entity location) {
+        if (!(location instanceof ItemEntity itemEntity)) {
+            return null;
+        }
+
+        CompoundTag itemData = new CompoundTag();
+        itemEntity.addAdditionalSaveData(itemData);
+        return getLockedReturnPlayerId(itemData);
+    }
+
+    @Nullable
+    private static UUID getLockedReturnPlayerId(CompoundTag itemData) {
+        if (itemData.hasUUID("Owner")) {
+            return itemData.getUUID("Owner");
+        }
+        if (itemData.hasUUID("Thrower")) {
+            return itemData.getUUID("Thrower");
+        }
+        return null;
+    }
+
+    @Nullable
+    private Player findReturnPlayer() {
+        if (this.lockedReturnPlayerId == null) {
+            return null;
+        }
+        if (!(this.level() instanceof ServerLevel serverLevel)) {
+            return null;
+        }
+
+        Player player = serverLevel.getPlayerByUUID(this.lockedReturnPlayerId);
+        return isValidReturnPlayer(player) ? player : null;
+    }
+
+    private boolean isValidReturnPlayer(@Nullable Player player) {
+        return player != null
+                && player.isAlive()
+                && player.level() == this.level();
+    }
+
+    private void lockToReturnPlayer() {
+        if (this.lockedReturnPlayerId != null) {
+            this.setTarget(this.lockedReturnPlayerId);
+        }
+    }
+
+    @Override
+    public void readAdditionalSaveData(@NotNull CompoundTag compound) {
+        super.readAdditionalSaveData(compound);
+        this.lockedReturnPlayerId = getLockedReturnPlayerId(compound);
+        this.lockToReturnPlayer();
     }
 
     @Override
