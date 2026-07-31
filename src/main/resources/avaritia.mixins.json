@@ -17,6 +17,7 @@
   ],
   "client": [
     "compat.JeiModIdHelperMixin",
+    "client.FeatureRenderDispatcherMixin",
     "client.RenderPassMixin",
     "client.RenderSystemMixin",
     "client.RenderTypeMixin"

@@ -2,7 +2,6 @@ package committee.nova.mods.avaritia.client;
 
 import committee.nova.mods.avaritia.Const;
 import committee.nova.mods.avaritia.Res;
-import committee.nova.mods.avaritia.api.client.render.CosmicRenderQueue;
 import committee.nova.mods.avaritia.api.iface.IColored;
 import committee.nova.mods.avaritia.api.iface.IFilterItem;
 import committee.nova.mods.avaritia.client.model.entity.InfinityShieldModel;
@@ -99,7 +98,6 @@ import net.neoforged.neoforge.client.event.RegisterParticleProvidersEvent;
 import net.neoforged.neoforge.client.event.RegisterRenderPipelinesEvent;
 import net.neoforged.neoforge.client.event.RegisterSpecialModelRendererEvent;
 import net.neoforged.neoforge.client.event.RegisterTextureAtlasesEvent;
-import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.client.event.TextureAtlasStitchedEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
@@ -358,11 +356,6 @@ public class AvaritiaClient {
     public static void registerParticleProviders(RegisterParticleProvidersEvent event) {
         event.registerSpriteSet(ModParticles.CHARGE.get(), ChargeParticle.Factory::new);
         event.registerSpriteSet(ModParticles.SHOCKWAVE_PARTICLE.get(), ShockwaveParticle.Provider::new);
-    }
-
-    @SubscribeEvent
-    public static void onRenderLevel(RenderLevelStageEvent.AfterLevel event) {
-        CosmicRenderQueue.renderAll();
     }
 
     private static void renderDarknessOverlay(GuiGraphicsExtractor guiGraphics, net.minecraft.client.DeltaTracker deltaTracker) {

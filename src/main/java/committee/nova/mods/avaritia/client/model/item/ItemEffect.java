@@ -50,10 +50,15 @@ public enum ItemEffect {
     }
 
     public AvaritiaItemModelRenderers.EffectLayerArgument createArgument(List<BakedQuad> quads, @Nullable ClientLevel level,
-                                                                         @Nullable ItemOwner owner,
+                                                                          @Nullable ItemOwner owner,
+                                                                          ItemDisplayContext displayContext, ItemStack stack) {
+        return createArgument(quads, level, owner != null ? owner.asLivingEntity() : null, displayContext, stack);
+    }
+
+    public AvaritiaItemModelRenderers.EffectLayerArgument createArgument(List<BakedQuad> quads, @Nullable ClientLevel level,
+                                                                         @Nullable LivingEntity entity,
                                                                          ItemDisplayContext displayContext, ItemStack stack) {
         long time = level != null ? level.getGameTime() : 0L;
-        LivingEntity entity = owner != null ? owner.asLivingEntity() : null;
         boolean itemHeldByEntity = entity != null && displayContext != ItemDisplayContext.GUI;
         float yaw = itemHeldByEntity ? (float) (entity.getYRot() * 2.0F * Math.PI / 360.0F) : 0.0F;
         float pitch = itemHeldByEntity ? -(float) (entity.getXRot() * 2.0F * Math.PI / 360.0F) : 0.0F;

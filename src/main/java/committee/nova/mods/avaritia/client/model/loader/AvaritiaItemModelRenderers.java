@@ -1,6 +1,8 @@
 package committee.nova.mods.avaritia.client.model.loader;
 
 import committee.nova.mods.avaritia.Const;
+import committee.nova.mods.avaritia.api.client.render.item.ItemEffectRenderCall;
+import committee.nova.mods.avaritia.api.client.render.item.ItemEffectRenderQueue;
 import committee.nova.mods.avaritia.client.model.loader.utils.halo.HaloSetting;
 import committee.nova.mods.avaritia.client.model.loader.utils.halo.HaloUtils;
 import committee.nova.mods.avaritia.client.render.mesh.SimpleMesh;
@@ -12,6 +14,7 @@ import com.mojang.blaze3d.vertex.QuadInstance;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.special.SpecialModelRenderer;
@@ -40,6 +43,7 @@ import java.util.function.Consumer;
  */
 public final class AvaritiaItemModelRenderers {
     public static final SpecialModelRenderer<EffectLayerArgument> EFFECT = new EffectSpecialRenderer();
+    public static final SpecialModelRenderer<EffectQueueLayerArgument> EFFECT_QUEUE = new EffectQueueSpecialRenderer();
     public static final SpecialModelRenderer<HaloLayerArgument> HALO = new HaloSpecialRenderer();
     public static final SpecialModelRenderer<PulseLayerArgument> PULSE = new PulseSpecialRenderer();
     public static final SpecialModelRenderer<TridentLayerArgument> TRIDENT = new TridentSpecialRenderer();
@@ -55,14 +59,17 @@ public final class AvaritiaItemModelRenderers {
     }
 
     public record EffectLayerArgument(List<BakedQuad> quads, RenderType renderType, AvaritiaShaderUniforms.Effect effect,
-                               float time, float yaw, float pitch, float scale,
-                               float opacity, float[] uvs) {
+                                 float time, float yaw, float pitch, float scale,
+                                 float opacity, float[] uvs) {
         /**
          * 在提交几何前绑定当前物品自己的 shader 参数。
          */
-        void applyUniforms() {
+        public void applyUniforms() {
             AvaritiaShaderUniforms.set(this.renderType, this.effect, this.time, this.yaw, this.pitch, this.scale, this.opacity, this.uvs);
         }
+    }
+
+    public record EffectQueueLayerArgument(EffectLayerArgument effect, ItemStack stack, ItemDisplayContext displayContext) {
     }
 
     public record HaloLayerArgument(Identifier texture, HaloSetting setting) {
@@ -297,6 +304,57 @@ public final class AvaritiaItemModelRenderers {
         @Override
         public @Nullable EffectLayerArgument extractArgument(ItemStack stack) {
             return null;
+        }
+    }
+
+    private static final class EffectQueueSpecialRenderer implements SpecialModelRenderer<EffectQueueLayerArgument> {
+        @Override
+        public void submit(@Nullable EffectQueueLayerArgument argument, PoseStack poseStack,
+                           SubmitNodeCollector submitNodeCollector, int lightCoords, int overlayCoords,
+                           boolean hasFoil, int outlineColor) {
+            if (argument == null || argument.effect().quads().isEmpty()) {
+                return;
+            }
+
+            ItemEffectRenderQueue.enqueue(new ItemEffectRenderCall(
+                    argument.effect(),
+                    poseStack,
+                    argument.stack(),
+                    argument.displayContext(),
+                    lightCoords,
+                    overlayCoords
+            ));
+        }
+
+        @Override
+        public void getExtents(Consumer<Vector3fc> output) {
+        }
+
+        @Override
+        public @Nullable EffectQueueLayerArgument extractArgument(ItemStack stack) {
+            return null;
+        }
+    }
+
+    public static void renderEffectLayer(EffectLayerArgument argument, PoseStack poseStack,
+                                         MultiBufferSource source, int lightCoords, int overlayCoords) {
+        if (argument.quads().isEmpty()) {
+            return;
+        }
+
+        argument.applyUniforms();
+        VertexConsumer buffer = source.getBuffer(argument.renderType());
+        QuadInstance instance = new QuadInstance();
+        instance.setColor(-1);
+        instance.setLightCoords(lightCoords);
+        instance.setOverlayCoords(overlayCoords);
+
+        for (BakedQuad quad : argument.quads()) {
+            buffer.putBakedQuad(poseStack.last(), quad, instance);
+        }
+
+        if (source instanceof MultiBufferSource.BufferSource bufferSource) {
+            bufferSource.endBatch(argument.renderType());
         }
     }
 }

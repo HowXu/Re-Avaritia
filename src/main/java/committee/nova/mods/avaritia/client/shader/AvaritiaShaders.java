@@ -21,6 +21,12 @@ public class AvaritiaShaders {
             new DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, false);
     private static final DepthStencilState ITEM_EFFECT_OVERLAY_DEPTH =
             new DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, true);
+    // RGB-only additive overlay. Writing alpha from the mask makes GUI/first-person targets treat
+    // the cosmic layer as the whole item pixel, so the item base remains responsible for alpha.
+    private static final ColorTargetState EFFECT_OVERLAY_COLOR_TARGET =
+            new ColorTargetState(java.util.Optional.of(BlendFunction.LIGHTNING), ColorTargetState.WRITE_COLOR);
+    private static final ColorTargetState TRANSLUCENT_COLOR_AND_ALPHA =
+            new ColorTargetState(BlendFunction.TRANSLUCENT);
 
     public static final float[] COSMIC_UVS = new float[40];
     public static TextureAtlasSprite[] COSMIC_SPRITES = new TextureAtlasSprite[10];
@@ -45,20 +51,20 @@ public class AvaritiaShaders {
     }
 
     private static RenderPipeline registerPipeline(RegisterRenderPipelinesEvent event, String name, VertexFormat vertexFormat, VertexFormat.Mode mode) {
-        return registerPipeline(event, name, name, vertexFormat, mode, TRANSLUCENT_EFFECT_DEPTH);
+        return registerPipeline(event, name, name, vertexFormat, mode, TRANSLUCENT_EFFECT_DEPTH, TRANSLUCENT_COLOR_AND_ALPHA);
     }
 
     private static RenderPipeline registerItemPipeline(RegisterRenderPipelinesEvent event, String name, VertexFormat vertexFormat, VertexFormat.Mode mode) {
-        return registerPipeline(event, name, name, vertexFormat, mode, ITEM_EFFECT_OVERLAY_DEPTH);
+        return registerPipeline(event, name, name, vertexFormat, mode, ITEM_EFFECT_OVERLAY_DEPTH, EFFECT_OVERLAY_COLOR_TARGET);
     }
 
     private static RenderPipeline registerPipeline(RegisterRenderPipelinesEvent event, String name, String shaderName, VertexFormat vertexFormat, VertexFormat.Mode mode) {
-        return registerPipeline(event, name, shaderName, vertexFormat, mode, TRANSLUCENT_EFFECT_DEPTH);
+        return registerPipeline(event, name, shaderName, vertexFormat, mode, TRANSLUCENT_EFFECT_DEPTH, TRANSLUCENT_COLOR_AND_ALPHA);
     }
 
     private static RenderPipeline registerPipeline(RegisterRenderPipelinesEvent event, String name, String shaderName,
                                                    VertexFormat vertexFormat, VertexFormat.Mode mode,
-                                                   DepthStencilState depthStencilState) {
+                                                   DepthStencilState depthStencilState, ColorTargetState colorTargetState) {
         var shader = Const.rl("core/" + shaderName);
         RenderPipeline pipeline = RenderPipeline.builder(RenderPipelines.ENTITY_SNIPPET)
                 .withLocation(Const.rl(name))
@@ -66,7 +72,7 @@ public class AvaritiaShaders {
                 .withFragmentShader(shader)
                 .withSampler("Sampler2")
                 .withUniform(AvaritiaShaderUniforms.UNIFORM_NAME, UniformType.UNIFORM_BUFFER)
-                .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
+                .withColorTargetState(colorTargetState)
                 .withDepthStencilState(depthStencilState)
                 .withCull(false)
                 .withVertexFormat(vertexFormat, mode)

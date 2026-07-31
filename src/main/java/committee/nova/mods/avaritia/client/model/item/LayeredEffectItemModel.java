@@ -97,7 +97,10 @@ public final class LayeredEffectItemModel implements ItemModel {
 
         // effectQuads 由 mask 烘焙而来，只在 mask 区域绘制动态星空/永恒等效果。
         if (shouldRenderEffectLayer(tridentGeometry)) {
-            appendEffectLayer(renderState, displayContext, this.effect.createArgument(this.effectQuads, level, owner, displayContext, stack), this.effectExtents);
+            appendQueuedEffectLayer(renderState, displayContext,
+                    this.effect.createArgument(this.effectQuads, level, owner, displayContext, stack),
+                    this.effectExtents,
+                    stack);
         }
 
         if (shouldRenderArc(displayContext)) {
@@ -197,12 +200,14 @@ public final class LayeredEffectItemModel implements ItemModel {
         renderState.setAnimated();
     }
 
-    private void appendEffectLayer(ItemStackRenderState renderState, ItemDisplayContext displayContext,
-                                   AvaritiaItemModelRenderers.EffectLayerArgument argument, Vector3fc[] extents) {
+    private void appendQueuedEffectLayer(ItemStackRenderState renderState, ItemDisplayContext displayContext,
+                                         AvaritiaItemModelRenderers.EffectLayerArgument argument,
+                                         Vector3fc[] extents, ItemStack stack) {
         ItemStackRenderState.LayerRenderState layer = renderState.newLayer();
         layer.setExtents(() -> extents);
         layer.setLocalTransform(this.transformation);
-        layer.setupSpecialModel(AvaritiaItemModelRenderers.EFFECT, argument);
+        layer.setupSpecialModel(AvaritiaItemModelRenderers.EFFECT_QUEUE,
+                new AvaritiaItemModelRenderers.EffectQueueLayerArgument(argument, stack.copy(), displayContext));
         this.properties.applyToLayer(layer, displayContext);
         renderState.setAnimated();
         // 超尺寸 GUI 物品按 model identity 复用离屏纹理。RenderType 每次提交都会新建，不能进入 identity，
@@ -210,4 +215,5 @@ public final class LayeredEffectItemModel implements ItemModel {
         renderState.appendModelIdentityElement(this.effect);
         renderState.appendModelIdentityElement(Float.floatToIntBits(argument.opacity()));
     }
+
 }
